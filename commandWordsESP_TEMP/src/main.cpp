@@ -1,19 +1,10 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
-#include <Adafruit_NeoPixel.h>
 #include "driver/i2s.h"
 
-#define LED_PIN_BOARD 48
-#define LED_COUNT 1
-
 // -------------GLOBAL VARIABLE----------------
-unsigned long lastTime = 0;  // typ zmiennych bo taki zwraca millis(), timer jako delay ale bez freeza
-
-// For RGB LED
-Adafruit_NeoPixel strip(LED_COUNT, LED_PIN_BOARD, NEO_BGR + NEO_KHZ800);
-volatile int ledMode = 1; // 0 - constant, 1 - Blink 
-volatile uint32_t ledColor = 0x0000FFFF;; // Yellow
+unsigned long lastTime = 0;  // typ zmiennych bo taki zwraca millis()
 
 // -------------CONFIG WiFi----------------
 const char* ssid = "Orange_Swiatlowod_7EE0";
@@ -67,38 +58,8 @@ void sendDataByWebSocked(){
   }
 }
 
-// --------------TASKS----------------------------
-void TaskBlink(void *){ // this task no need parametr
-
-  strip.begin();
-  strip.setBrightness(25);
-  bool ledState = 0;
-
-  for(;;){
-    if(ledMode == 0){
-      strip.setPixelColor(0, ledColor);
-      strip.show();
-
-      vTaskDelay(100 / portTICK_PERIOD_MS);
-
-    }
-    else if (ledMode == 1){
-      if(ledState)
-        strip.setPixelColor(0, ledColor);
-      else
-        strip.setPixelColor(0, 0);
-      strip.show();
-      ledState = ledState == true ? false : true ;
-
-      vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
-  }
-}
-
 void setup() {
   Serial.begin(115200);
-
-  xTaskCreatePinnedToCore(TaskBlink, "TaskBlink", 3000, NULL, 1, NULL, 0);
 
   while (!Serial) {
     delay(10); // Wait for serial monitor, Only for test!!!!!!!!!
@@ -106,9 +67,6 @@ void setup() {
 
   // Setup for WiFi
   initWiFi();
-  ledMode = 0;
-  ledColor = 0x000000FF;
-
   // Setup for webSocket
   initWebSocket();
 
@@ -116,6 +74,7 @@ void setup() {
 
 void loop() {
   ws.cleanupClients();
+
 
   sendDataByWebSocked();
 
