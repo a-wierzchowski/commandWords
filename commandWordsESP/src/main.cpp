@@ -14,7 +14,7 @@
 #define I2S_SCK_PIN GPIO_NUM_5
 #define I2S_SD_PIN GPIO_NUM_7
 
-#define I2S_BUFFER_SIZE 1024
+#define I2S_BUFFER_SIZE 10240  // 10B PSRAM (HEAP)
 
 // -------------GLOBAL VARIABLE----------------
 unsigned long lastTime = 0;  // typ zmiennych bo taki zwraca millis(), timer jako delay ale bez freeza
@@ -50,10 +50,12 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len){
-  if (type == WS_EVT_CONNECT)
-    Serial.printf("Klient podłączył się do webSocket: %u\n", client->id());
-  else if (type == WS_EVT_DISCONNECT)
-    Serial.printf("Klient rozłączył się z webSocket: %u\n", client->id());
+  if(client != NULL){
+    if (type == WS_EVT_CONNECT)
+      Serial.printf("Klient podłączył się do webSocket: %u\n", client->id());
+    else if (type == WS_EVT_DISCONNECT)
+      Serial.printf("Klient rozłączył się z webSocket: %u\n", client->id());
+  }
 }
 
 void initWebSocket(){
@@ -99,8 +101,10 @@ void setupI2S(){
 }
 // read data from mic and send
 void taskI2S(void *){
-  int32_t *i2s_32_buffer = (int32_t*)malloc(I2S_BUFFER_SIZE);    // for inmp441, 24 bit but we get 32 bit
-  int16_t *i2s_16_buffer = (int16_t*)malloc(I2S_BUFFER_SIZE / 2); // for vosk, only 16bit per sample
+  //int32_t *i2s_32_buffer = (int32_t*)malloc(I2S_BUFFER_SIZE);    // for inmp441, 24 bit but we get 32 bit
+  //int16_t *i2s_16_buffer = (int16_t*)malloc(I2S_BUFFER_SIZE / 2); // for vosk, only 16bit per sample
+  int32_t *i2s_32_buffer = (int32_t*)ps_malloc(I2S_BUFFER_SIZE);    // switch to PSRAM
+  int16_t *i2s_16_buffer = (int16_t*)ps_malloc(I2S_BUFFER_SIZE / 2); // switch to PSRAM
   if(i2s_32_buffer == NULL || i2s_16_buffer == NULL){
     Serial.println("Error memory allocation bufor I2S");
     vTaskDelete(NULL);
@@ -177,17 +181,18 @@ void taskBlink(void *){ // this task no need parametr
   }
 }
 
+
+
 void setup() {
   Serial.begin(115200);
 
-  xTaskCreatePinnedToCore(taskBlink, "TaskBlink", 3000, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(taskBlink, "TaskBlink", 4096, NULL, 1, NULL, 0);
 
   while (!Serial) {
     delay(10); // Wait for serial monitor, Only for test!!!!!!!!!
     Serial.printf(".");
   }
   Serial.printf("\n");
-
 
   // Setup for WiFi
   initWiFi();
@@ -199,9 +204,11 @@ void setup() {
 
   // Setup MIC
   setupI2S();
-  xTaskCreatePinnedToCore(taskI2S, "TaskI2S", 4096, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(taskI2S, "TaskI2S", 10240, NULL, 1, NULL, 0);
 
 }
+
+
 
 void loop() {
   ws.cleanupClients();

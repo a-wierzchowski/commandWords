@@ -1,8 +1,9 @@
 import websockets
 import asyncio
 import time
-from vosk import Model, KaldiRecognizer
+from vosk import Model, KaldiRecognizer, SetLogLevel
 
+SetLogLevel(-1)
 
 LINK = "ws://192.168.1.35/ws" # <----- Setup here !!!!!--------------------------------
 model = Model("models/vosk-model-small-pl-0.22")
@@ -13,7 +14,7 @@ async def receiveData():
         try:
             ws = await websockets.connect(LINK, ping_interval=None)
             while True:
-                message = await ws.recv()
+                message = await asyncio.wait_for(ws.recv(), timeout=5.0)
                 if rec.AcceptWaveform(message):
                     print('\n' + rec.Result())
         except:
