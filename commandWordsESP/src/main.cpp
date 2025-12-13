@@ -14,7 +14,7 @@
 #define I2S_SCK_PIN GPIO_NUM_5
 #define I2S_SD_PIN GPIO_NUM_7
 
-#define I2S_BUFFER_SIZE 256
+#define I2S_BUFFER_SIZE 1024
 
 // -------------GLOBAL VARIABLE----------------
 unsigned long lastTime = 0;  // typ zmiennych bo taki zwraca millis(), timer jako delay ale bez freeza
@@ -53,7 +53,7 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsE
   if (type == WS_EVT_CONNECT)
     Serial.printf("Klient podłączył się do webSocket: %u\n", client->id());
   else if (type == WS_EVT_DISCONNECT)
-    Serial.printf("Klient rozłączył się do webSocket: %u\n", client->id());
+    Serial.printf("Klient rozłączył się z webSocket: %u\n", client->id());
 }
 
 void initWebSocket(){
@@ -99,8 +99,9 @@ void setupI2S(){
 }
 // read data from mic and send
 void taskI2S(void *){
-  uint8_t *i2s_buffer = (uint8_t*)malloc(I2S_BUFFER_SIZE);
-  if(i2s_buffer == NULL){
+  int32_t *i2s_32_buffer = (int32_t*)malloc(I2S_BUFFER_SIZE);    // for inmp441, 24 bit but we get 32 bit
+  int16_t *i2s_16_buffer = (int16_t*)malloc(I2S_BUFFER_SIZE / 2); // for vosk, only 16bit per sample
+  if(i2s_32_buffer == NULL || i2s_16_buffer == NULL){
     Serial.println("Error memory allocation bufor I2S");
     vTaskDelete(NULL);
     return;
@@ -109,10 +110,17 @@ void taskI2S(void *){
   size_t bytes_read;
 
   for(;;){
-    esp_err_t result = i2s_read(I2S_PORT_NUM, i2s_buffer, I2S_BUFFER_SIZE, &bytes_read, portMAX_DELAY);
+    esp_err_t result = i2s_read(I2S_PORT_NUM, i2s_32_buffer, I2S_BUFFER_SIZE, &bytes_read, portMAX_DELAY);
 
     if(result == ESP_OK && bytes_read > 0){
-      ws.binaryAll(i2s_buffer, bytes_read);
+
+      int sample_count = bytes_read / 4; // single sample from inmp441 = 4B (32 bit)
+
+      for(int i=0; i<sample_count; i++){
+        i2s_16_buffer[i] = (int16_t)(i2s_32_buffer[i] >> 16);  // 'convert' from 32 bit to 16bit by lose last 16 bit
+      }
+
+      ws.binaryAll((uint8_t*)i2s_16_buffer, sample_count * 2); // accepts only char*, uint8_t*, String.  |  now, every sample have 2B (16 bit)
     }
     else{
       Serial.printf("Error read I2S: %d\n", result);
@@ -176,7 +184,10 @@ void setup() {
 
   while (!Serial) {
     delay(10); // Wait for serial monitor, Only for test!!!!!!!!!
+    Serial.printf(".");
   }
+  Serial.printf("\n");
+
 
   // Setup for WiFi
   initWiFi();

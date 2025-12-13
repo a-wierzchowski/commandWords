@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "commandWordsPy"
+		},
+		{
+			"path": "../../../../../home/leszek/Dokumenty/programming/python/vosk-api"
 		}
 	],
 	"settings": {}
