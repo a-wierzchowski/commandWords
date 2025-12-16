@@ -8,6 +8,9 @@
 #define LED_PIN_BOARD 48
 #define LED_COUNT 1
 
+// PINS CONTROLS FROM COMMANDS
+#define LIGHT_1 GPIO_NUM_2
+
 // MICROPHONE INMP441
 #define I2S_PORT_NUM I2S_NUM_1
 #define I2S_WS_PIN GPIO_NUM_6
@@ -21,10 +24,26 @@ unsigned long lastTime = 0;  // typ zmiennych bo taki zwraca millis(), timer jak
 
 // For RGB LED
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN_BOARD, NEO_BGR + NEO_KHZ800);
-volatile int ledMode = 1; // 0 - constant, 1 - Blink 
+volatile int ledMode = 1; // 0 - constant, 1 - Blink, 2 - off
 volatile uint32_t ledColor = 0x0000FFFF;; // Yellow
 
+// --------------PINS CONTROL----------------------------
 
+void commandsPinout(int8_t arg){
+  switch (arg)
+  {
+  case 1:
+    Serial.print("Zapal diode\n");
+    digitalWrite(LIGHT_1, HIGH);
+    ledMode = 0;
+    break;
+  case 2:
+    Serial.print("Zgas diode\n");
+    digitalWrite(LIGHT_1, LOW);
+    ledMode = 2;
+    break;
+  }
+}
 
 // -------------CONFIG WiFi----------------
 const char* ssid = "Orange_Swiatlowod_7EE0";
@@ -38,7 +57,7 @@ void initWiFi(){
     Serial.print(".");
     delay(1000);
   }
-  Serial.println("====================");
+  Serial.println("\n====================");
   Serial.println("Połączono z siecią");
   Serial.println("SSID: " + WiFi.SSID());
   Serial.println("IP: " + WiFi.localIP().toString());
@@ -51,10 +70,23 @@ AsyncWebSocket ws("/ws");
 
 void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len){
   if(client != NULL){
-    if (type == WS_EVT_CONNECT)
-      Serial.printf("Klient podłączył się do webSocket: %u\n", client->id());
-    else if (type == WS_EVT_DISCONNECT)
-      Serial.printf("Klient rozłączył się z webSocket: %u\n", client->id());
+
+    switch (type) {
+      case WS_EVT_CONNECT:
+        Serial.printf("Klient podłączył się do webSocket: %u\n", client->id());
+        break;
+      case WS_EVT_DISCONNECT:
+        Serial.printf("Klient rozłączył się z webSocket: %u\n", client->id());
+        break;
+      case WS_EVT_DATA:{
+        AwsFrameInfo *info = (AwsFrameInfo*) arg;
+        if(info->final && info->index == 0 && info->len == len){ // whole message is in a single frame
+          Serial.printf("Klient przesłał: %d o dlugosci: %zu\n", data[0], len);
+          commandsPinout(data[0]);
+        }
+      }
+      break;
+    }
   }
 }
 
@@ -62,6 +94,30 @@ void initWebSocket(){
   ws.onEvent(onWebSocketEvent);
   server.addHandler(&ws);
   server.begin();
+}
+
+// -------------WEB PANEL----------------
+// PROGMEM mean "don't load this varialbe to RAM"
+const char index_html[] PROGMEM = R"rawliteral( 
+<!DOCTYPE html>
+<HTML lang="pl">
+  <HEAD>
+
+  </HEAD>
+  <BODY>
+  
+  </BODY>
+</HTML>
+)rawliteral";
+
+void setupWebRequests(){
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send_P(200, "text/html", index_html);  // methods with sufix "*_P" implement read and send piece by piece from Flash (no RAM)
+  });
+
+  server.onNotFound([](AsyncWebServerRequest *request){
+    request->send(404, "text/plain", "Strona nie istnieje.");
+  });
 }
 
 // -------------CONFIG MICROPHONE----------------
@@ -109,6 +165,7 @@ void taskI2S(void *){
     Serial.println("Error memory allocation bufor I2S");
     vTaskDelete(NULL);
     return;
+
   }
 
   size_t bytes_read;
@@ -134,27 +191,15 @@ void taskI2S(void *){
 
 }
 
-// -------------FUNCTION SEND DATA----------------
-//                ONLY FOR TEST
-
-// void sendDataByWebSocked(){
-//   static uint16_t counter = 1;
-//   // better delay - nie robi freeza 
-//   if(millis() - lastTime > 1000){
-//     lastTime = millis();
-    
-//     Serial.printf("Przesłano wiadomość %d\n", counter);
-//     String messagesText = "Wiadomość" + String(counter);
-//     counter++;
-
-//     ws.textAll(messagesText);
-
-//   }
-// }
-
-
 // --------------TASKS----------------------------
 void taskBlink(void *){ // this task no need parametr
+
+  /*
+  ledMode:
+          0 - Const power on
+          2 - Blink
+          2 - Power off
+  */
 
   strip.begin();
   strip.setBrightness(25);
@@ -178,26 +223,32 @@ void taskBlink(void *){ // this task no need parametr
 
       vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
+    else if (ledMode == 2){
+      strip.setPixelColor(0, 0);
+      strip.show();
+    }
   }
 }
-
-
 
 void setup() {
   Serial.begin(115200);
 
   xTaskCreatePinnedToCore(taskBlink, "TaskBlink", 4096, NULL, 1, NULL, 0);
 
-  while (!Serial) {
-    delay(10); // Wait for serial monitor, Only for test!!!!!!!!!
-    Serial.printf(".");
-  }
+  // while (!Serial) {
+  //   delay(10); // Wait for serial monitor, Only for test!!!!!!!!!
+  //   Serial.printf(".");
+  // }
+  delay(2000);  // Wait for serial monitor, Only for test!!!!!!!!!
   Serial.printf("\n");
 
   // Setup for WiFi
   initWiFi();
   ledMode = 0;
   ledColor = 0x000000FF;
+
+  // Setup for Website
+  setupWebRequests();
 
   // Setup for webSocket
   initWebSocket();
@@ -206,6 +257,8 @@ void setup() {
   setupI2S();
   xTaskCreatePinnedToCore(taskI2S, "TaskI2S", 10240, NULL, 1, NULL, 0);
 
+  // Setup pinout
+  pinMode(LIGHT_1, OUTPUT);
 }
 
 
