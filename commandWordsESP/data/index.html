@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Panel Konfiguracji</title>
+    <style>
+        *{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body{
+            font-family:Verdana, Geneva, Tahoma, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        header{
+            background-color: rgb(0, 0, 0);
+            color: rgb(136, 0, 0);
+            padding: 20px;
+            text-align: center;
+            font-size: 20px;
+            
+        }
+        main{
+            display: flex;
+            flex: 1;
+            text-align: center;
+            flex-wrap: wrap;
+        }
+        section{
+            flex: 1;
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+            padding: 40px;
+            color: rgb(206, 203, 203);
+        }
+        .left{
+            background-color: rgb(107, 8, 8);
+        }
+        .right{
+            background-color: rgb(95, 15, 15);
+        }
+        form{
+            display: flex;
+            flex-direction: column;
+            padding: 30px;
+            background-color: rgba(0, 0, 0, 0.644);
+        }
+        input{
+            padding: 6px;
+            background-color: rgb(107, 8, 8);
+            color: rgb(206, 203, 203);
+            font-size: 120%;
+            border: none;
+            margin: 8px;
+            padding: 10px;
+        }
+        .div-input-row{
+            display: flex;
+            align-items: center;
+        }
+        label{
+            min-width: 10%;
+            max-width: 30%;
+            text-align: left;
+            margin-left: 10px;
+        }
+        button{
+            padding: 10px;
+            background-color: rgba(90, 88, 88, 0.781);
+            color: rgb(206, 203, 203);
+            border: none;
+        }
+        button:hover{
+            background-color: rgba(255, 0, 0, 0.5);
+            color: rgb(255, 255, 255);
+        }
+        .div-space{
+            margin: 15px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Panel Konfiguracyjny</h1>
+    </header>
+    <main>
+        
+        <section class="left">
+            <form action="" method="post">
+                <h2>Ustawienia WiFi</h2>
+                    <label for="label1">SSID:</label>
+                    <input type="text" name="ssid" id="label1">
+                <div class="div-space"></div>
+                    <label for="label2">PASSWORD:</label>
+                    <input type="password" name="pass" id="label2">
+                 <div class="div-space"></div>
+                 <div class="div-space"></div>
+                <button type="submit">Zapisz sieć</button>
+            </form>
+        </section>
+
+        <section class="right">
+            <form action="" method="post">
+                <h2>Lista komend</h2>
+                <div class="div-input-row">
+                    <input type="text" name="command1" id="label3">
+                    <label for="label3">#Komenda Pierwsza</label>
+                </div>
+                <div class="div-input-row">
+                    <input type="text" name="command2" id="label4">
+                    <label for="label3">#Komenda Druga</label>
+                </div>
+                <div class="div-input-row">
+                    <input type="text" name="command3" id="label5">
+                    <label for="label3">#Komenda Trzecia</label>
+                </div>
+                <div class="div-input-row">
+                    <input type="text" name="command4" id="label6">
+                    <label for="label3">#Komenda Czwarta</label>
+                </div class="div-input-row">
+                <div class="div-space"></div>
+                <button type="submit">Zapisz Komendy</button>
+            </form>
+            <div class="div-space"></div>
+            <div class="div-space"></div>
+        </section>
+    </main>
+</body>
+</html>
+
+

@@ -3,6 +3,7 @@
 #include <ESPAsyncWebServer.h>
 #include <Adafruit_NeoPixel.h>
 #include "driver/i2s.h"
+#include "SPIFFS.h"
 
 // RGB
 #define LED_PIN_BOARD 48
@@ -97,22 +98,10 @@ void initWebSocket(){
 }
 
 // -------------WEB PANEL----------------
-// PROGMEM mean "don't load this varialbe to RAM"
-const char index_html[] PROGMEM = R"rawliteral( 
-<!DOCTYPE html>
-<HTML lang="pl">
-  <HEAD>
-
-  </HEAD>
-  <BODY>
-  
-  </BODY>
-</HTML>
-)rawliteral";
 
 void setupWebRequests(){
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/html", index_html);  // methods with sufix "*_P" implement read and send piece by piece from Flash (no RAM)
+    request->send(SPIFFS, "/index.html", "text/html");
   });
 
   server.onNotFound([](AsyncWebServerRequest *request){
@@ -246,6 +235,11 @@ void setup() {
   initWiFi();
   ledMode = 0;
   ledColor = 0x000000FF;
+
+  if(!SPIFFS.begin()){
+    Serial.println("ERROR MOUNT FILE SYSTEM SPIFFS");
+    return;
+  }
 
   // Setup for Website
   setupWebRequests();
