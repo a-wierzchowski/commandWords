@@ -3,7 +3,7 @@
 #include <ESPAsyncWebServer.h>
 #include <Adafruit_NeoPixel.h>
 #include "driver/i2s.h"
-#include "SPIFFS.h"
+#include "LittleFS.h"
 
 // RGB
 #define LED_PIN_BOARD 48
@@ -22,6 +22,7 @@
 
 // -------------GLOBAL VARIABLE----------------
 unsigned long lastTime = 0;  // typ zmiennych bo taki zwraca millis(), timer jako delay ale bez freeza
+bool switchWiFi = false;
 
 // For RGB LED
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN_BOARD, NEO_BGR + NEO_KHZ800);
@@ -47,8 +48,8 @@ void commandsPinout(int8_t arg){
 }
 
 // -------------CONFIG WiFi----------------
-const char* ssid = "Orange_Swiatlowod_7EE0";
-const char* password = "tcN6HLNThXQ6nPtNR6";
+String ssid = "Orange_Swiatlowod_7EE0";
+String password = "tcN6HLNThXQ6nPtNR6";
 
 void initWiFi(){
   WiFi.mode(WIFI_STA);
@@ -101,12 +102,35 @@ void initWebSocket(){
 
 void setupWebRequests(){
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/index.html", "text/html");
+    request->send(LittleFS, "/index.html", "text/html");
+  });
+
+  server.on("/config/wifi", HTTP_POST, [](AsyncWebServerRequest *request){
+    if(request->hasParam("SSID", true) && request->hasParam("PASS", true)){
+      ssid = request->getParam("SSID", true)->value();
+      password = request->getParam("PASS", true)->value();
+
+      Serial.println("SSID: " + ssid);
+      Serial.println("PASS: " + password);
+
+      String json = "{\"status\":\"passed\"}";
+      request->send(200, "application/json", json);
+      
+      lastTime = millis();
+      switchWiFi = true;
+      
+    }
+    else{
+      Serial.println("Error przeslania ssid i pass: ");
+      request->send(400, "text/plain", "Brak zmiennych");
+    }
   });
 
   server.onNotFound([](AsyncWebServerRequest *request){
     request->send(404, "text/plain", "Strona nie istnieje.");
   });
+
+  
 }
 
 // -------------CONFIG MICROPHONE----------------
@@ -236,8 +260,8 @@ void setup() {
   ledMode = 0;
   ledColor = 0x000000FF;
 
-  if(!SPIFFS.begin()){
-    Serial.println("ERROR MOUNT FILE SYSTEM SPIFFS");
+  if(!LittleFS.begin(true)){
+    Serial.println("ERROR MOUNT FILE SYSTEM LittleFS");
     return;
   }
 
@@ -260,6 +284,14 @@ void setup() {
 void loop() {
   ws.cleanupClients();
 
+  if(switchWiFi && millis() - lastTime  > 1500){ // To make sure that  we sent respone to website client (POST, JSON)
+    switchWiFi = false;
+    lastTime = 0;
+    ws.closeAll();
+    WiFi.disconnect();
+    delay(500);
+    initWiFi();
+  }
   //sendDataByWebSocked();
 
   delay(10); // for RTOS to do tasks in background

@@ -91,21 +91,22 @@
     <main>
         
         <section class="left">
-            <form action="" method="post">
+            <form>
                 <h2>Ustawienia WiFi</h2>
-                    <label for="label1">SSID:</label>
-                    <input type="text" name="ssid" id="label1">
+                    <label for="ssid">SSID:</label>
+                    <input type="text" name="ssid" id="ssid">
                 <div class="div-space"></div>
-                    <label for="label2">PASSWORD:</label>
-                    <input type="password" name="pass" id="label2">
-                 <div class="div-space"></div>
-                 <div class="div-space"></div>
-                <button type="submit">Zapisz sieć</button>
+                    <label for="pass">PASSWORD:</label>
+                    <input type="password" name="pass" id="pass">
+                    <div class="div-space"></div>
+                    <div class="div-space"></div>
+                <button type="button" onclick="sendWifiConfig()">Zapisz sieć</button>
+                <p id="resultWifi"></p>
             </form>
         </section>
 
         <section class="right">
-            <form action="" method="post">
+            <form>
                 <h2>Lista komend</h2>
                 <div class="div-input-row">
                     <input type="text" name="command1" id="label3">
@@ -124,12 +125,37 @@
                     <label for="label3">#Komenda Czwarta</label>
                 </div class="div-input-row">
                 <div class="div-space"></div>
-                <button type="submit">Zapisz Komendy</button>
+                <button type="button">Zapisz Komendy</button>
             </form>
             <div class="div-space"></div>
             <div class="div-space"></div>
         </section>
     </main>
+
+    <script>
+
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+
+        async function sendWifiConfig(){
+            document.getElementById('resultWifi').textContent = "Przeslano";
+            ssid = document.getElementById("ssid").value;
+            pass = document.getElementById("pass").value;
+
+            const formData = new FormData();
+            formData.append("SSID", ssid);
+            formData.append("PASS", pass);
+            
+            const result = await fetch(`/config/wifi`, {method: 'POST', body: formData});
+
+            const data = await result.json();
+            document.getElementById('resultWifi').textContent = data.status;
+            document.getElementById("ssid").value = "";
+            document.getElementById("pass").value = "";
+            await delay(2000);
+            document.getElementById('resultWifi').textContent = "";
+        }
+    </script>
+
 </body>
 </html>
 
