@@ -3,9 +3,12 @@ import asyncio
 import json
 from vosk import Model, KaldiRecognizer, SetLogLevel
 
+
 commands = {
     "włącz światło": 1,
-    "wyłącz światło": 2
+    "wyłącz światło": 2,
+    "zapal światło": 1,
+    "zgaś światło": 2
 }
 
 SetLogLevel(-1)
@@ -18,6 +21,7 @@ async def receiveData():
     while True:
         try:
             ws = await websockets.connect(LINK, ping_interval=None)
+            print("Połączono")
             while True:
                 message = await asyncio.wait_for(ws.recv(), timeout=5.0)
                 if rec.AcceptWaveform(message):
@@ -30,11 +34,14 @@ async def receiveData():
                                 print()
                                 await ws.send(bytes([commands[command]])) # only string or binary frame 
                                 break
-        except:
+        except(asyncio.TimeoutError, OSError):
             for i in range(5, 0, -1):
                 print(f"Ponowna próba połączenia za {i} sek.")
                 await asyncio.sleep(1)
             
 
 if __name__ == "__main__":
-    asyncio.run(receiveData())
+    try:
+        asyncio.run(receiveData())
+    except(KeyboardInterrupt):
+        print("\nProgram przerwany: [Ctrl+C]")
