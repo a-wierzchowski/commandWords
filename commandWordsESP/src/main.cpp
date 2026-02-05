@@ -4,6 +4,7 @@
 #include <Adafruit_NeoPixel.h>
 #include "driver/i2s.h"
 #include "LittleFS.h"
+#include "fvad.h"
 
 // RGB
 #define LED_PIN_BOARD 48
@@ -18,7 +19,9 @@
 #define I2S_SCK_PIN GPIO_NUM_5
 #define I2S_SD_PIN GPIO_NUM_7
 
-#define I2S_BUFFER_SIZE 10240  // 10B PSRAM (HEAP)
+#define I2S_BUFFER_SIZE 1920  // 480 (1 sample) * 4 (byte)
+#define I2S_BUFFER_SIZE_SEND 5760 // 480(one sample) * 2 (byte) * 6 (frames)
+#define SAMPLE_RATE 16000
 
 // -------------GLOBAL VARIABLE----------------
 unsigned long lastTime = 0;  // typ zmiennych bo taki zwraca millis(), timer jako delay ale bez freeza
@@ -29,6 +32,7 @@ Adafruit_NeoPixel strip(LED_COUNT, LED_PIN_BOARD, NEO_BGR + NEO_KHZ800);
 volatile int ledMode = 1; // 0 - constant, 1 - Blink, 2 - off
 volatile uint32_t ledColor = 0x0000FFFF;; // Yellow
 
+Fvad *vad = NULL; // Voice Activity detecton
 // --------------PINS CONTROL----------------------------
 
 void commandsPinout(int8_t arg){
@@ -98,6 +102,7 @@ void initWebSocket(){
   server.begin();
 }
 
+
 // -------------WEB PANEL----------------
 
 void setupWebRequests(){
@@ -137,7 +142,7 @@ void setupWebRequests(){
 void setupI2S(){
   i2s_config_t i2s_config = {
     .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),  // steruje zetarem + RX czyli receive / odbieranie
-    .sample_rate = 16000,  // próbkowanie / 16kHz czyli 16 000 odczytów na sekundę
+    .sample_rate = SAMPLE_RATE,  // próbkowanie / 16kHz czyli 16 000 odczytów na sekundę
     .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT, // INMP441 wysyła dane po 24 bity ale I2S czyta w blokach 32-bitowych
     .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT, // Lewy kanał / L/R do GND
     .communication_format = I2S_COMM_FORMAT_STAND_I2S, // standard of Philips
@@ -172,16 +177,21 @@ void setupI2S(){
 void taskI2S(void *){
   //int32_t *i2s_32_buffer = (int32_t*)malloc(I2S_BUFFER_SIZE);    // for inmp441, 24 bit but we get 32 bit
   //int16_t *i2s_16_buffer = (int16_t*)malloc(I2S_BUFFER_SIZE / 2); // for vosk, only 16bit per sample
+
+
   int32_t *i2s_32_buffer = (int32_t*)ps_malloc(I2S_BUFFER_SIZE);    // switch to PSRAM
   int16_t *i2s_16_buffer = (int16_t*)ps_malloc(I2S_BUFFER_SIZE / 2); // switch to PSRAM
-  if(i2s_32_buffer == NULL || i2s_16_buffer == NULL){
+  int16_t *i2s_16_buffer_to_send = (int16_t*)ps_malloc(I2S_BUFFER_SIZE_SEND); 
+  if(i2s_32_buffer == NULL || i2s_16_buffer == NULL || i2s_16_buffer_to_send == NULL){
     Serial.println("Error memory allocation bufor I2S");
     vTaskDelete(NULL);
     return;
-
   }
 
   size_t bytes_read;
+  int test_counter = 0;
+  int frame_counter = 0;
+  int send_size=0;
 
   for(;;){
     esp_err_t result = i2s_read(I2S_PORT_NUM, i2s_32_buffer, I2S_BUFFER_SIZE, &bytes_read, portMAX_DELAY);
@@ -194,15 +204,69 @@ void taskI2S(void *){
         i2s_16_buffer[i] = (int16_t)(i2s_32_buffer[i] >> 16);  // 'convert' from 32 bit to 16bit by lose last 16 bit
       }
 
-      ws.binaryAll((uint8_t*)i2s_16_buffer, sample_count * 2); // accepts only char*, uint8_t*, String.  |  now, every sample have 2B (16 bit)
+      int check_voice = fvad_process(vad, i2s_16_buffer, sample_count);
+      if (check_voice == 1){
+        //Serial.printf("Wykryto głos %d\n", test_counter++);
+        frame_counter = 50;
+      }
+      else if(check_voice == -1)
+        Serial.println("Invalid frame length");
+      
+      if (ws.count() > 0){
+        if(frame_counter > 0){
+
+          if (send_size + sample_count * 2 <= I2S_BUFFER_SIZE_SEND){ // *2 bcs we mind about size, where one sample = 2 bytes
+            memcpy(&((uint8_t*)i2s_16_buffer_to_send)[send_size], i2s_16_buffer, sample_count * 2);
+            send_size += sample_count * 2;
+          }
+
+          if(send_size >= I2S_BUFFER_SIZE_SEND){
+            ws.binaryAll((uint8_t*)i2s_16_buffer_to_send, send_size); // accepts only char*, uint8_t*, String.  |  now, every sample have 2B (16 bit)
+            send_size = 0;
+            //Serial.printf("Przesłano %d\n", test_counter);
+          }
+            
+          frame_counter--;
+        }
+        else if(send_size > 0){
+          ws.binaryAll((uint8_t*)i2s_16_buffer_to_send, send_size); 
+          send_size = 0;
+          //Serial.printf("Przesłano koniec %d\n", test_counter);
+        }
+      }
+      else{
+          send_size = 0;
+      }
     }
     else{
       Serial.printf("Error read I2S: %d\n", result);
     }
+    
     vTaskDelay(pdMS_TO_TICKS(1)); // access cpu for another tasks like wifi
   }
 
 }
+
+// ------CONFIG VAD(speach recognizer)--------
+void initVAD(){
+  vad = fvad_new();
+  if(!vad){
+    Serial.printf("Error VAD: out of memory\nRESTERT IN 5 SEC...");
+    delay(5000);
+    ESP.restart();
+  }
+  if(fvad_set_mode(vad, 3) < 0){
+    Serial.printf("Error VAD: cannot set mode\nRESTERT IN 5 SEC...");
+    delay(5000);
+    ESP.restart();
+  }
+  if(fvad_set_sample_rate(vad, SAMPLE_RATE) < 0){
+    Serial.printf("Error VAD: cannot set sample rate\nRESTERT IN 5 SEC...");
+    delay(5000);
+    ESP.restart();
+  }
+}
+
 
 // --------------TASKS----------------------------
 void taskBlink(void *){ // this task no need parametr
@@ -273,7 +337,10 @@ void setup() {
 
   // Setup MIC
   setupI2S();
-  xTaskCreatePinnedToCore(taskI2S, "TaskI2S", 10240, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(taskI2S, "TaskI2S", 20480, NULL, 1, NULL, 1);
+
+  // Setup Voice Activity Detecion
+  initVAD();
 
   // Setup pinout
   pinMode(LIGHT_1, OUTPUT);
