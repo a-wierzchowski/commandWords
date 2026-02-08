@@ -6,6 +6,7 @@
 #include "driver/i2s.h"
 #include "LittleFS.h"
 #include "fvad.h"
+#include "secrets.h"
 
 // RGB
 #define LED_PIN_BOARD 48
@@ -53,8 +54,8 @@ void commandsPinout(int8_t arg){
 }
 
 // -------------CONFIG WiFi----------------
-String ssid = "Orange_Swiatlowod_7EE0";
-String password = "tcN6HLNThXQ6nPtNR6";
+String ssid = WIFI_SSID;
+String password = WIFI_PASS;
 
 void initWiFi(){
   WiFi.mode(WIFI_STA);
