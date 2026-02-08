@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
+#include <AsyncUDP.h>
 #include <Adafruit_NeoPixel.h>
 #include "driver/i2s.h"
 #include "LittleFS.h"
@@ -19,8 +20,8 @@
 #define I2S_SCK_PIN GPIO_NUM_5
 #define I2S_SD_PIN GPIO_NUM_7
 
-#define I2S_BUFFER_SIZE 1920  // 480 (1 sample) * 4 (byte)
-#define I2S_BUFFER_SIZE_SEND 5760 // 480(one sample) * 2 (byte) * 6 (frames)
+#define I2S_BUFFER_SIZE 1920  // 480 samples * 4 byte per one (32 bit from I2S)
+#define I2S_BUFFER_SIZE_SEND 11520 // 480 samples * 2 (byte) * 12 frames
 #define SAMPLE_RATE 16000
 
 // -------------GLOBAL VARIABLE----------------
@@ -147,8 +148,8 @@ void setupI2S(){
     .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT, // Lewy kanał / L/R do GND
     .communication_format = I2S_COMM_FORMAT_STAND_I2S, // standard of Philips
     .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,  // ustawienie priorytetu dla przerwań / ważne ale np WiFi będzie ważniejsze
-    .dma_buf_count = 8,  // 8 buforów  * 64 = 512 bajtów bezpośrednio do pamięci (dane) (DMA | Direct Memory Access)
-    .dma_buf_len = 64,   // po 64 bajty
+    .dma_buf_count = 8,  // 8 buforów  * 480 = 3840 bajtów bezpośrednio do pamięci (dane) (DMA | Direct Memory Access)
+    .dma_buf_len = 480,   // samples
     .use_apll = false,   // APLL | Audio Phase-Locked Loop (precyzyjny zegar audio)
     .tx_desc_auto_clear = false, 
     .fixed_mclk = 0
@@ -304,6 +305,7 @@ void taskBlink(void *){ // this task no need parametr
       strip.setPixelColor(0, 0);
       strip.show();
     }
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 
