@@ -28,6 +28,19 @@
 // -------------GLOBAL VARIABLE----------------
 unsigned long lastTime = 0;  // typ zmiennych bo taki zwraca millis(), timer jako delay ale bez freeza
 bool switchWiFi = false;
+int16_t clients_counter = 0;
+String command1_on = "włącz światło";
+String command1_off = "wyłącz światło";
+
+String command2_on = "otwórz bramę";
+String command2_off = "zamknij bramę";
+
+String command3_on = "tak";
+String command3_off = "nie";
+
+String command4_on = "jeden";
+String command4_off = "zero";
+
 
 // For RGB LED
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN_BOARD, NEO_BGR + NEO_KHZ800);
@@ -78,13 +91,26 @@ AsyncWebSocket ws("/ws");
 
 void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len){
   if(client != NULL){
-
+    String json;
     switch (type) {
       case WS_EVT_CONNECT:
         Serial.printf("Klient podłączył się do webSocket: %u\n", client->id());
+        json = "{";
+        json += "\"" + command1_on + "\":1,";
+        json += "\"" + command1_off + "\":2,";
+        json += "\"" + command2_on + "\":3,";
+        json += "\"" + command2_off + "\":4,";
+        json += "\"" + command3_on + "\":5,";
+        json += "\"" + command3_off + "\":6,";
+        json += "\"" + command4_on + "\":7,";
+        json += "\"" + command4_off + "\":8";
+        json += "}";
+        ws.textAll(json);
+        clients_counter++;
         break;
       case WS_EVT_DISCONNECT:
         Serial.printf("Klient rozłączył się z webSocket: %u\n", client->id());
+        clients_counter--;
         break;
       case WS_EVT_DATA:{
         AwsFrameInfo *info = (AwsFrameInfo*) arg;
@@ -117,6 +143,11 @@ void setupWebRequests(){
       ssid = request->getParam("SSID", true)->value();
       password = request->getParam("PASS", true)->value();
 
+      if(ssid == NULL || password == NULL){
+        Serial.println("ERROR: Empty parameters");
+        return -1;
+      }
+
       Serial.println("SSID: " + ssid);
       Serial.println("PASS: " + password);
 
@@ -132,12 +163,66 @@ void setupWebRequests(){
       request->send(400, "text/plain", "Brak zmiennych");
     }
   });
+  server.on("/config/commands", HTTP_POST, [](AsyncWebServerRequest *request){
+    String commands[8], temp;
+    bool flag = 0;
+    if(request->hasParam("command1_on", true) && request->hasParam("command1_off", true) &&
+      request->hasParam("command2_on", true) && request->hasParam("command2_off", true) &&
+      request->hasParam("command3_on", true) && request->hasParam("command3_off", true) &&
+      request->hasParam("command4_on", true) && request->hasParam("command4_off", true))
+      {
+        for(int i=0; i<8; i+=2){
+          commands[i] = request->getParam("command" + (String)(i/2+1) + "_on", true)->value();
+          commands[i+1] = request->getParam("command" + (String)(i/2+1) + "_off", true)->value();
+        }
 
+        for(int i = 0; i<8; i++){
+          for(int j = i+1; j<8; j++){
+            if(commands[i] == commands[j]){
+              request->send(400, "text/plain", "Polecenia nie mogą się powtarzać");
+              return;
+            }
+          }
+        }
+        command1_on = commands[0];
+        command1_off = commands[1];
+
+        command2_on = commands[2];
+        command2_off = commands[3];
+
+        command3_on = commands[4];
+        command3_off = commands[5];
+
+        command4_on = commands[6];
+        command4_off = commands[7];
+        ws.closeAll();
+        request->send(200, "text/plain", "Komendy zostały zmienione");
+    }
+    else{
+      request->send(400, "text/plain", "Wypełnij wszystkie pola");
+    }
+    
+  
+  });
+
+  server.on("/api/commands", HTTP_POST, [](AsyncWebServerRequest *request){
+    String json;
+    json = "{";
+    json += "\"command1_on\":\"" + command1_on + "\",";
+    json += "\"command1_off\":\"" + command1_off + "\",";
+    json += "\"command2_on\":\"" + command2_on + "\",";
+    json += "\"command2_off\":\"" + command2_off + "\",";
+    json += "\"command3_on\":\"" + command3_on + "\",";
+    json += "\"command3_off\":\"" + command3_off + "\",";
+    json += "\"command4_on\":\"" + command4_on + "\",";
+    json += "\"command4_off\":\"" + command4_off + "\"";
+    json += "}";
+    request->send(200, "application/json", json);
+  });
   server.onNotFound([](AsyncWebServerRequest *request){
     request->send(404, "text/plain", "Strona nie istnieje.");
   });
 
-  
 }
 
 // -------------CONFIG MICROPHONE----------------
@@ -214,7 +299,7 @@ void taskI2S(void *){
       else if(check_voice == -1)
         Serial.println("Invalid frame length");
       
-      if (ws.count() > 0){
+      if (clients_counter > 0){
         if(frame_counter > 0){
 
           if (send_size + sample_count * 2 <= I2S_BUFFER_SIZE_SEND){ // *2 bcs we mind about size, where one sample = 2 bytes
@@ -362,7 +447,6 @@ void loop() {
     delay(500);
     initWiFi();
   }
-  //sendDataByWebSocked();
 
   delay(10); // for RTOS to do tasks in background
 }

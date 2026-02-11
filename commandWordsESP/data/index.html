@@ -106,26 +106,31 @@
         </section>
 
         <section class="right">
-            <form>
+            <form id="form_right">
                 <h2>Lista komend</h2>
                 <div class="div-input-row">
-                    <input type="text" name="command1" id="label3">
-                    <label for="label3">#Komenda Pierwsza</label>
+                    <input type="text" id="command1_on"  placeholder="ON">
+                    <input type="text" id="command1_off"  placeholder="OFF">
+                    <label>#Komenda Pierwsza</label>
                 </div>
                 <div class="div-input-row">
-                    <input type="text" name="command2" id="label4">
-                    <label for="label3">#Komenda Druga</label>
+                    <input type="text" id="command2_on"  placeholder="ON">
+                    <input type="text" id="command2_off" placeholder="OFF">
+                    <label>#Komenda Druga</label>
                 </div>
                 <div class="div-input-row">
-                    <input type="text" name="command3" id="label5">
-                    <label for="label3">#Komenda Trzecia</label>
+                    <input type="text" id="command3_on" placeholder="ON">
+                    <input type="text" id="command3_off" placeholder="OFF">
+                    <label>#Komenda Trzecia</label>
                 </div>
                 <div class="div-input-row">
-                    <input type="text" name="command4" id="label6">
-                    <label for="label3">#Komenda Czwarta</label>
+                    <input type="text" id="command4_on" placeholder="ON">
+                    <input type="text" id="command4_off" placeholder="OFF">
+                    <label>#Komenda Czwarta</label>
                 </div class="div-input-row">
                 <div class="div-space"></div>
-                <button type="button">Zapisz Komendy</button>
+                <button type="button" onclick="sendCommandConfig()">Zapisz Komendy</button>
+                <p id="resultCommand"></p>
             </form>
             <div class="div-space"></div>
             <div class="div-space"></div>
@@ -154,6 +159,98 @@
             await delay(2000);
             document.getElementById('resultWifi').textContent = "";
         }
+
+        async function sendCommandConfig() {
+            command1_on = document.getElementById("command1_on").value;
+            command1_off = document.getElementById("command1_off").value;
+
+            command2_on = document.getElementById("command2_on").value;
+            command2_off = document.getElementById("command2_off").value;
+
+            command3_on = document.getElementById("command3_on").value;
+            command3_off = document.getElementById("command3_off").value;
+
+            command4_on = document.getElementById("command4_on").value;
+            command4_off = document.getElementById("command4_off").value;
+
+            if((command1_on == "" && command1_off != "") || (command1_on != "" && command1_off == "") ||
+                (command2_on == "" && command2_off != "") || (command2_on != "" && command2_off == "") ||
+                (command3_on == "" && command3_off != "") || (command3_on != "" && command3_off == "") ||
+                (command4_on == "" && command4_off != "") || (command4_on != "" && command4_off == "")){
+                    document.getElementById('resultCommand').textContent = "Wypełnij oba pola danej komendy";
+            }
+            else if(command1_on == "" && command1_off == "" &&
+                    command2_on == "" && command2_off == "" && 
+                    command3_on == "" && command3_off == "" && 
+                    command4_on == "" && command4_off == ""){
+                        document.getElementById('resultCommand').textContent = "Wypełnij przynajmniej jeden wiersz";
+                    }
+            else{
+                document.getElementById('resultCommand').textContent = "";
+                const formData = new FormData();
+
+                if (command1_on != ""){
+                    formData.append("command1_on", command1_on);
+                    formData.append("command1_off", command1_off);
+                }
+                if (command2_on != ""){
+                    formData.append("command2_on", command2_on);
+                    formData.append("command2_off", command2_off);
+                }
+                if (command3_on != ""){
+                    formData.append("command3_on", command3_on);
+                    formData.append("command3_off", command3_off);
+                }
+                if (command4_on != ""){
+                    formData.append("command4_on", command4_on);
+                    formData.append("command4_off", command4_off);
+                }
+
+                const result = await fetch(`/config/commands`, {method: 'POST', body: formData});
+                const text = await result.text();
+                
+                if(result.ok)
+                    showCurrentCommands();
+
+                document.getElementById('resultCommand').textContent = text;
+                await delay(5000);
+                document.getElementById('resultCommand').textContent = "";
+            }
+        }
+        async function showCurrentCommands() {
+            
+            const response = await fetch('/api/commands', {method: 'POST'});
+            const data = await response.json();
+
+            command1_on = data.command1_on;
+            command1_off = data.command1_off;
+
+            command2_on = data.command2_on;
+            command2_off = data.command2_off;
+
+            command3_on = data.command3_on;
+            command3_off = data.command3_off;
+
+            command4_on = data.command4_on;
+            command4_off = data.command4_off;
+
+            document.getElementById("command1_on").value = command1_on;
+            document.getElementById("command1_off").value = command1_off;
+
+            document.getElementById("command2_on").value = command2_on;
+            document.getElementById("command2_off").value = command2_off;
+
+            document.getElementById("command3_on").value = command3_on;
+            document.getElementById("command3_off").value = command3_off;
+
+            document.getElementById("command4_on").value = command4_on;
+            document.getElementById("command4_off").value = command4_off;
+
+        }
+
+        window.onload = async () => {
+            showCurrentCommands();
+        };
     </script>
 
 </body>

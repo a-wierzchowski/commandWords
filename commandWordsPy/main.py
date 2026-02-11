@@ -3,10 +3,10 @@ import asyncio
 import json
 import wave
 from vosk import Model, KaldiRecognizer, SetLogLevel
-from websockets.exceptions import ConnectionClosedError
+from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
 
-commands = {
+commands1 = {
     "włącz światło": 1,
     "wyłącz światło": 2,
     "zapal światło": 1,
@@ -14,6 +14,7 @@ commands = {
     "tak": 1,
     "nie": 2
 }
+commands = {}
 
 SetLogLevel(-1)
 
@@ -31,7 +32,12 @@ async def receiveData():
         try:
             ws = await websockets.connect(LINK)
             print("Połączono")
-            while True:
+            message = await asyncio.wait_for(ws.recv(), timeout=None)
+            commands = json.loads(message)
+            for x in commands:
+                print(f"\"{x}\"", end=" ")
+            print()
+            while commands:
                 #message = await asyncio.wait_for(ws.recv(), timeout=5.0)
                 message = await asyncio.wait_for(ws.recv(), timeout=None)
                 wav_file.writeframes(message)
@@ -45,8 +51,8 @@ async def receiveData():
                                 print()
                                 await ws.send(bytes([commands[command]])) # only string or binary frame 
                                 break
-        except(asyncio.TimeoutError, OSError, ConnectionClosedError):
-            for i in range(5, 0, -1):
+        except(asyncio.TimeoutError, OSError, ConnectionClosedError, ConnectionClosedOK):
+            for i in range(3, 0, -1):
                 print(f"Ponowna próba połączenia za {i} sek.")
                 await asyncio.sleep(1)
             
