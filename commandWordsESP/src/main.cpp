@@ -6,6 +6,7 @@
 #include "driver/i2s.h"
 #include "LittleFS.h"
 #include "fvad.h"
+#include <Preferences.h>
 #include "secrets.h"
 
 // RGB
@@ -29,27 +30,25 @@
 unsigned long lastTime = 0;  // typ zmiennych bo taki zwraca millis(), timer jako delay ale bez freeza
 bool switchWiFi = false;
 int16_t clients_counter = 0;
-String command1_on = "włącz światło";
-String command1_off = "wyłącz światło";
 
-String command2_on = "otwórz bramę";
-String command2_off = "zamknij bramę";
+// available commands
+String command1_on, command1_off, command2_on, command2_off, command3_on, command3_off, command4_on, command4_off;
 
-String command3_on = "tak";
-String command3_off = "nie";
+// WiFi Credentials
+String ssid, password;
 
-String command4_on = "jeden";
-String command4_off = "zero";
-
+// Preferences is class to control key-value flash storage
+Preferences pref;
 
 // For RGB LED
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN_BOARD, NEO_BGR + NEO_KHZ800);
 volatile int ledMode = 1; // 0 - constant, 1 - Blink, 2 - off
 volatile uint32_t ledColor = 0x0000FFFF;; // Yellow
 
-Fvad *vad = NULL; // Voice Activity detecton
-// --------------PINS CONTROL----------------------------
+// Voice Activity detecton
+Fvad *vad = NULL; 
 
+// --------------PINS CONTROL----------------------------
 void commandsPinout(int8_t arg){
   switch (arg)
   {
@@ -66,10 +65,47 @@ void commandsPinout(int8_t arg){
   }
 }
 
-// -------------CONFIG WiFi----------------
-String ssid = WIFI_SSID;
-String password = WIFI_PASS;
+// ------CONFIG PERMANENT VARIABLE---------
+void initPreferencesWiFi(){
+  pref.begin("wifi_cred", false); // false mean RW mode
+  pref.putString("wifi_ssid", WIFI_SSID);
+  pref.putString("wifi_pass", WIFI_PASS);
+  pref.end();
+}
+void initPreferencesCommands(){
+  pref.begin("commands", false); 
+  pref.putString("command1_on", "włącz światło");
+  pref.putString("command1_off", "wyłącz światło");
+  pref.putString("command2_on", "otwórz bramę");
+  pref.putString("command2_off", "zamknij bramę");
+  pref.putString("command3_on", "tak");
+  pref.putString("command3_off", "nie");
+  pref.putString("command4_on", "jeden");
+  pref.putString("command4_off", "zero");
+  pref.end();
+}
 
+void loadWiFIFromFlash(){
+  pref.begin("wifi_cred", true);
+  ssid = pref.getString("wifi_ssid");
+  password = pref.getString("wifi_pass");
+  pref.end();
+}
+
+void loadCommandsFromFlash(){
+  pref.begin("commands", true);
+  command1_on = pref.getString("command1_on");
+  command1_off = pref.getString("command1_off");
+  command2_on = pref.getString("command2_on");
+  command2_off = pref.getString("command2_off");
+  command3_on = pref.getString("command3_on");
+  command3_off = pref.getString("command3_off");
+  command4_on = pref.getString("command4_on");
+  command4_off = pref.getString("command4_off");
+  pref.end();
+}
+
+// -------------CONFIG WiFi----------------
 void initWiFi(){
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -145,8 +181,14 @@ void setupWebRequests(){
 
       if(ssid == NULL || password == NULL){
         Serial.println("ERROR: Empty parameters");
-        return -1;
+        request->send(400, "text/plain", "Brak zmiennych");
+        return;
       }
+
+      pref.begin("wifi_cred", false);
+      pref.putString("wifi_ssid", ssid);
+      pref.putString("wifi_pass", password);
+      pref.end();
 
       Serial.println("SSID: " + ssid);
       Serial.println("PASS: " + password);
@@ -184,17 +226,19 @@ void setupWebRequests(){
             }
           }
         }
-        command1_on = commands[0];
-        command1_off = commands[1];
+        pref.begin("commands", false);
+        pref.putString("command1_on", commands[0]);
+        pref.putString("command1_off", commands[1]);
+        pref.putString("command2_on", commands[2]);
+        pref.putString("command2_off", commands[3]);
+        pref.putString("command3_on", commands[4]);
+        pref.putString("command3_off", commands[5]);
+        pref.putString("command4_on", commands[6]);
+        pref.putString("command4_off", commands[7]);
+        pref.end();
 
-        command2_on = commands[2];
-        command2_off = commands[3];
+        loadCommandsFromFlash();
 
-        command3_on = commands[4];
-        command3_off = commands[5];
-
-        command4_on = commands[6];
-        command4_off = commands[7];
         ws.closeAll();
         request->send(200, "text/plain", "Komendy zostały zmienione");
     }
@@ -202,7 +246,6 @@ void setupWebRequests(){
       request->send(400, "text/plain", "Wypełnij wszystkie pola");
     }
     
-  
   });
 
   server.on("/api/commands", HTTP_POST, [](AsyncWebServerRequest *request){
@@ -400,12 +443,24 @@ void setup() {
 
   xTaskCreatePinnedToCore(taskBlink, "TaskBlink", 4096, NULL, 1, NULL, 0);
 
-  // while (!Serial) {
-  //   delay(10); // Wait for serial monitor, Only for test!!!!!!!!!
-  //   Serial.printf(".");
-  // }
   delay(2000);  // Wait for serial monitor, Only for test!!!!!!!!!
   Serial.printf("\n");
+
+  // Setup for first launch 
+
+  pref.begin("wifi_cred", false);
+  if(!pref.isKey("wifi_ssid")){
+    Serial.println("####CHECK####");
+    pref.end();
+    initPreferencesWiFi();
+    initPreferencesCommands();
+  }
+  else
+    pref.end();
+
+  // load variable to RAM
+  loadWiFIFromFlash();
+  loadCommandsFromFlash();
 
   // Setup for WiFi
   initWiFi();

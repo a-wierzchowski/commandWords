@@ -5,15 +5,6 @@ import wave
 from vosk import Model, KaldiRecognizer, SetLogLevel
 from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
 
-
-commands1 = {
-    "włącz światło": 1,
-    "wyłącz światło": 2,
-    "zapal światło": 1,
-    "zgaś światło": 2,
-    "tak": 1,
-    "nie": 2
-}
 commands = {}
 
 SetLogLevel(-1)

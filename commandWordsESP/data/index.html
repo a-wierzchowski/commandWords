@@ -151,12 +151,19 @@
             formData.append("PASS", pass);
             
             const result = await fetch(`/config/wifi`, {method: 'POST', body: formData});
-
-            const data = await result.json();
-            document.getElementById('resultWifi').textContent = data.status;
-            document.getElementById("ssid").value = "";
-            document.getElementById("pass").value = "";
-            await delay(2000);
+            
+            if(result.ok){
+                const data = await result.json();
+                document.getElementById('resultWifi').textContent = data.status;
+                document.getElementById("ssid").value = "";
+                document.getElementById("pass").value = "";
+            }
+            else{
+                const text = await result.text();
+                document.getElementById('resultWifi').textContent = text;
+            }
+            
+            await delay(5000);
             document.getElementById('resultWifi').textContent = "";
         }
 
