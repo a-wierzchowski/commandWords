@@ -14,7 +14,11 @@
 #define LED_COUNT 1
 
 // PINS CONTROLS FROM COMMANDS
-#define LIGHT_1 GPIO_NUM_2
+#define PIN_OUT_1 GPIO_NUM_2
+#define PIN_OUT_2 GPIO_NUM_42
+#define PIN_OUT_3 GPIO_NUM_41
+#define PIN_OUT_4 GPIO_NUM_40
+
 
 // MICROPHONE INMP441
 #define I2S_PORT_NUM I2S_NUM_1
@@ -52,16 +56,45 @@ Fvad *vad = NULL;
 void commandsPinout(int8_t arg){
   switch (arg)
   {
-  case 1:
-    Serial.print("Zapal diode\n");
-    digitalWrite(LIGHT_1, HIGH);
-    ledMode = 0;
-    break;
-  case 2:
-    Serial.print("Zgas diode\n");
-    digitalWrite(LIGHT_1, LOW);
-    ledMode = 2;
-    break;
+    // Control 1
+    case 1:
+      Serial.print("Włączony Pin 1\n");
+      digitalWrite(PIN_OUT_1, HIGH);
+      break;
+    case 2:
+      Serial.print("Wyłączony pin 1\n");
+      digitalWrite(PIN_OUT_1, LOW);
+      break;
+
+    // Control 2
+    case 3:
+      Serial.print("Włączony Pin 2\n");
+      digitalWrite(PIN_OUT_2, HIGH);
+      break;
+    case 4:
+      Serial.print("Wyłączony pin 2\n");
+      digitalWrite(PIN_OUT_2, LOW);
+      break;
+
+    // Control 3
+    case 5:
+      Serial.print("Włączony Pin 3\n");
+      digitalWrite(PIN_OUT_3, HIGH);
+      break;
+    case 6:
+      Serial.print("Wyłączony pin 3\n");
+      digitalWrite(PIN_OUT_3, LOW);
+      break;
+
+    // Control 4
+    case 7:
+      Serial.print("Włączony Pin 4\n");
+      digitalWrite(PIN_OUT_4, HIGH);
+      break;
+    case 8:
+      Serial.print("Wyłączony pin 4\n");
+      digitalWrite(PIN_OUT_4, LOW);
+      break;
   }
 }
 
@@ -486,7 +519,10 @@ void setup() {
   initVAD();
 
   // Setup pinout
-  pinMode(LIGHT_1, OUTPUT);
+  pinMode(PIN_OUT_1, OUTPUT);
+  pinMode(PIN_OUT_2, OUTPUT);
+  pinMode(PIN_OUT_3, OUTPUT);
+  pinMode(PIN_OUT_4, OUTPUT);
 }
 
 
