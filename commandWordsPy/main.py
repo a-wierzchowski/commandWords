@@ -14,10 +14,10 @@ model = Model("models/vosk-model-small-pl-0.22")
 rec = KaldiRecognizer(model, 16000)
 
 async def receiveData():
-    wav_file = wave.open("output.wav", 'wb')
-    wav_file.setnchannels(1)
-    wav_file.setsampwidth(2)
-    wav_file.setframerate(16000)
+    # wav_file = wave.open("output.wav", 'wb')
+    # wav_file.setnchannels(1)
+    # wav_file.setsampwidth(2)
+    # wav_file.setframerate(16000)
 
     while True:
         try:
@@ -31,7 +31,7 @@ async def receiveData():
             while commands:
                 #message = await asyncio.wait_for(ws.recv(), timeout=5.0)
                 message = await asyncio.wait_for(ws.recv(), timeout=None)
-                wav_file.writeframes(message)
+                # wav_file.writeframes(message)
                 if rec.AcceptWaveform(message):
                     words = (json.loads(rec.Result()))['text']
                     if words:

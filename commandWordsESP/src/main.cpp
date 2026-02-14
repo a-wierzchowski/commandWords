@@ -176,10 +176,14 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsE
         json += "}";
         ws.textAll(json);
         clients_counter++;
+        if(clients_counter == 1)  
+          ledMode = 0;
         break;
       case WS_EVT_DISCONNECT:
         Serial.printf("Klient rozłączył się z webSocket: %u\n", client->id());
         clients_counter--;
+        if(clients_counter < 1)
+          ledMode = 1;
         break;
       case WS_EVT_DATA:{
         AwsFrameInfo *info = (AwsFrameInfo*) arg;
@@ -437,7 +441,7 @@ void taskBlink(void *){ // this task no need parametr
   /*
   ledMode:
           0 - Const power on
-          2 - Blink
+          1 - Blink
           2 - Power off
   */
 
@@ -497,7 +501,7 @@ void setup() {
 
   // Setup for WiFi
   initWiFi();
-  ledMode = 0;
+  ledMode = 1;
   ledColor = 0x000000FF;
 
   if(!LittleFS.begin(true)){
