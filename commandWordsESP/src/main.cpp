@@ -19,6 +19,8 @@
 #define PIN_OUT_3 GPIO_NUM_41
 #define PIN_OUT_4 GPIO_NUM_40
 
+// BOOT button
+#define BUTTON_BOOT GPIO_NUM_0
 
 // MICROPHONE INMP441
 #define I2S_PORT_NUM I2S_NUM_1
@@ -31,7 +33,8 @@
 #define SAMPLE_RATE 16000
 
 // -------------GLOBAL VARIABLE----------------
-unsigned long lastTime = 0;  // typ zmiennych bo taki zwraca millis(), timer jako delay ale bez freeza
+unsigned long lastTimeChangeWifi = 0;  // typ zmiennych bo taki zwraca millis(), timer jako delay ale bez freeza
+unsigned long timePressedButton = 0;
 bool switchWiFi = false;
 int16_t clients_counter = 0;
 
@@ -139,7 +142,7 @@ void loadCommandsFromFlash(){
 }
 
 // -------------CONFIG WiFi----------------
-void initWiFi(){
+void initWiFiConnect(){
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Serial.print("łączenie z siecią");
@@ -147,10 +150,30 @@ void initWiFi(){
     Serial.print(".");
     delay(1000);
   }
+
+  ledMode = 1;
+  ledColor = 0x000000FF;
+
   Serial.println("\n====================");
   Serial.println("Połączono z siecią");
   Serial.println("SSID: " + WiFi.SSID());
   Serial.println("IP: " + WiFi.localIP().toString());
+  Serial.println("====================");
+}
+
+void initWiFiAPMode(){
+  WiFi.mode(WIFI_AP);
+  const char* ssid = "ESP_AP_MODE";
+  //const char* pass = "12345678";
+  WiFi.softAP(ssid, NULL);
+
+  ledMode = 0;
+  ledColor = 0x0000FFFF;
+
+  Serial.println("\n====================");
+  Serial.println("Połączono z siecią");
+  Serial.println("SSID: " + (String)ssid);
+  Serial.println("IP: " + WiFi.softAPIP().toString());
   Serial.println("====================");
 }
 
@@ -233,7 +256,7 @@ void setupWebRequests(){
       String json = "{\"status\":\"passed\"}";
       request->send(200, "application/json", json);
       
-      lastTime = millis();
+      lastTimeChangeWifi = millis();
       switchWiFi = true;
       
     }
@@ -500,9 +523,7 @@ void setup() {
   loadCommandsFromFlash();
 
   // Setup for WiFi
-  initWiFi();
-  ledMode = 1;
-  ledColor = 0x000000FF;
+  initWiFiConnect();
 
   if(!LittleFS.begin(true)){
     Serial.println("ERROR MOUNT FILE SYSTEM LittleFS");
@@ -523,6 +544,7 @@ void setup() {
   initVAD();
 
   // Setup pinout
+  pinMode(BUTTON_BOOT, INPUT_PULLUP);
   pinMode(PIN_OUT_1, OUTPUT);
   pinMode(PIN_OUT_2, OUTPUT);
   pinMode(PIN_OUT_3, OUTPUT);
@@ -534,13 +556,31 @@ void setup() {
 void loop() {
   ws.cleanupClients();
 
-  if(switchWiFi && millis() - lastTime  > 1500){ // To make sure that  we sent respone to website client (POST, JSON)
+  if(switchWiFi && millis() - lastTimeChangeWifi  > 1500){ // To make sure that  we sent respone to website client (POST, JSON)
     switchWiFi = false;
-    lastTime = 0;
+    lastTimeChangeWifi = 0;
     ws.closeAll();
     WiFi.disconnect();
     delay(500);
-    initWiFi();
+    initWiFiConnect();
+  }
+
+  if(digitalRead(BUTTON_BOOT) == LOW){
+    if(timePressedButton == 0){
+      timePressedButton = millis();
+    }
+    else if(millis() - timePressedButton > 5000){
+      ledMode = 0;
+      ledColor = 0x0000FF00;
+      timePressedButton = 0;
+      ws.closeAll();
+      WiFi.disconnect();
+      delay(500);
+      initWiFiAPMode();
+    }
+  }
+  else if(digitalRead(BUTTON_BOOT) == HIGH && timePressedButton != 0){
+    timePressedButton = 0;
   }
 
   delay(10); // for RTOS to do tasks in background
