@@ -62,41 +62,41 @@ void commandsPinout(int8_t arg){
     // Control 1
     case 1:
       Serial.print("Włączony Pin 1\n");
-      digitalWrite(PIN_OUT_1, HIGH);
+      digitalWrite(PIN_OUT_1, LOW);
       break;
     case 2:
       Serial.print("Wyłączony pin 1\n");
-      digitalWrite(PIN_OUT_1, LOW);
+      digitalWrite(PIN_OUT_1, HIGH);
       break;
 
     // Control 2
     case 3:
       Serial.print("Włączony Pin 2\n");
-      digitalWrite(PIN_OUT_2, HIGH);
+      digitalWrite(PIN_OUT_2, LOW);
       break;
     case 4:
       Serial.print("Wyłączony pin 2\n");
-      digitalWrite(PIN_OUT_2, LOW);
+      digitalWrite(PIN_OUT_2, HIGH);
       break;
 
     // Control 3
     case 5:
       Serial.print("Włączony Pin 3\n");
-      digitalWrite(PIN_OUT_3, HIGH);
+      digitalWrite(PIN_OUT_3, LOW);
       break;
     case 6:
       Serial.print("Wyłączony pin 3\n");
-      digitalWrite(PIN_OUT_3, LOW);
+      digitalWrite(PIN_OUT_3, HIGH);
       break;
 
     // Control 4
     case 7:
       Serial.print("Włączony Pin 4\n");
-      digitalWrite(PIN_OUT_4, HIGH);
+      digitalWrite(PIN_OUT_4, LOW);
       break;
     case 8:
       Serial.print("Wyłączony pin 4\n");
-      digitalWrite(PIN_OUT_4, LOW);
+      digitalWrite(PIN_OUT_4, HIGH);
       break;
   }
 }
@@ -251,7 +251,6 @@ void setupWebRequests(){
       pref.end();
 
       Serial.println("SSID: " + ssid);
-      Serial.println("PASS: " + password);
 
       String json = "{\"status\":\"passed\"}";
       request->send(200, "application/json", json);
@@ -549,6 +548,11 @@ void setup() {
   pinMode(PIN_OUT_2, OUTPUT);
   pinMode(PIN_OUT_3, OUTPUT);
   pinMode(PIN_OUT_4, OUTPUT);
+
+  digitalWrite(PIN_OUT_1, LOW);
+  digitalWrite(PIN_OUT_2, LOW);
+  digitalWrite(PIN_OUT_3, LOW);
+  digitalWrite(PIN_OUT_4, LOW);
 }
 
 
